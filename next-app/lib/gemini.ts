@@ -20,5 +20,5 @@ export function getGeminiClient() {
   return new GoogleGenerativeAI(apiKey);
 }
 
-export const DEFAULT_MODEL = resolveModelId(process.env.GEMINI_MODEL_ID) || "gemini-1.5-flash";
+export const DEFAULT_MODEL = resolveModelId(process.env.GEMINI_MODEL_ID) || "gemini-flash-latest";
 export const getResolvedModelId = () => DEFAULT_MODEL; 
