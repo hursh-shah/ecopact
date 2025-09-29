@@ -70,8 +70,7 @@ const responseSchema = {
     "recycled_materials_percentage",
     "toxicity",
     "eco_score",
-  ],
-  additionalProperties: false,
+  ]
 } as const;
 
 function labelFromScore(score: number): string {
