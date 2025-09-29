@@ -11,9 +11,9 @@ npm install
 ```
 2. Configure environment
 ```bash
-cp .env.example .env.local
-# set GOOGLE_API_KEY=your_key
-# optionally set GEMINI_MODEL_ID to a tuned model ID
+auth cp .env.example .env.local
+# Set GEMINI_API_KEY=your_key  (or GOOGLE_API_KEY for backward compat)
+# Optionally set GEMINI_MODEL_ID (aliases supported: gemini-flash-latest → gemini-1.5-flash)
 ```
 3. Run locally
 ```bash
@@ -26,9 +26,9 @@ npm run dev
 - Response: `{ productName, eco: { score, label, breakdown }, alternatives }`
 
 ## Deployment (Vercel)
-- Push to GitHub and import the `next-app` folder as a project
-- Add `GOOGLE_API_KEY` (and optional `GEMINI_MODEL_ID`) in Vercel Project Settings → Environment Variables
-- Deploy. The API route runs on the Edge-compatible Node runtime.
+- Set Root Directory to `next-app`
+- Add `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) and optional `GEMINI_MODEL_ID` in Project Settings → Environment Variables
+- Deploy
 
 ## Tuning Gemini
-See `docs/TUNING.md` for preparing a JSONL dataset from `data/dataset.csv` and creating a tuned model via Vertex AI or AI Studio. Set `GEMINI_MODEL_ID` to use the tuned model in production. 
+See `docs/TUNING.md` for preparing a JSONL dataset and creating a tuned model. Set `GEMINI_MODEL_ID` to your tuned model ID. 
