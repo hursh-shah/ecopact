@@ -1,11 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-export function getGeminiClient() {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing GOOGLE_API_KEY env var");
-  }
-  return new GoogleGenerativeAI(apiKey);
+export function getGenAiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Missing GEMINI_API_KEY env var");
+  return new GoogleGenAI({ apiKey });
 }
 
-export const DEFAULT_MODEL = process.env.GEMINI_MODEL_ID || "gemini-1.5-flash"; 
+export const DEFAULT_MODEL = process.env.GEMINI_MODEL_ID || "gemini-flash-latest"; 

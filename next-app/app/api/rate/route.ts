@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiClient, DEFAULT_MODEL } from "@/lib/gemini";
+import { getGenAiClient, DEFAULT_MODEL } from "@/lib/gemini";
 import { loadCatalog, suggestAlternatives, rankToNumeric } from "@/lib/catalog";
 
 export const runtime = "nodejs";
@@ -8,7 +8,6 @@ function extractFromUrl(url: string): string | null {
   try {
     const u = new URL(url);
     const parts = u.pathname.split("/").filter(Boolean);
-    // typical: /Apple-iPhone-15-256GB/dp/B0... => take first segment
     if (parts.length > 0) {
       const slug = decodeURIComponent(parts[0]);
       if (!slug.toLowerCase().startsWith("dp")) {
@@ -29,7 +28,6 @@ async function fetchAmazonTitle(url: string): Promise<string | null> {
           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36",
         "accept-language": "en-US,en;q=0.9",
       },
-      // 10s timeout via AbortController
       signal: AbortSignal.timeout(10000),
     });
     const html = await res.text();
@@ -42,36 +40,6 @@ async function fetchAmazonTitle(url: string): Promise<string | null> {
     return null;
   }
 }
-
-const responseSchema = {
-  type: "object",
-  properties: {
-    materials: { type: "array", items: { type: "string" } },
-    recyclability: { type: "string", enum: ["No", "Yes", "Partial"] },
-    biodegradability: { type: "string", enum: ["No", "Yes", "Partial"] },
-    energy_consumption: { type: "string", enum: ["Very Low", "Low", "Medium-Low", "Medium", "Medium-High", "High", "Very High"] },
-    electricity_usage: { type: "string", enum: ["Very Low", "Low", "Medium-Low", "Medium", "Medium-High", "High", "Very High"] },
-    gasoline_usage: { type: "string", enum: ["Very Low", "Low", "Medium-Low", "Medium", "Medium-High", "High", "Very High"] },
-    water_usage: { type: "string", enum: ["Very Low", "Low", "Medium-Low", "Medium", "Medium-High", "High", "Very High"] },
-    emission_levels: { type: "string", enum: ["Very Low", "Low", "Medium-Low", "Medium", "Medium-High", "High", "Very High"] },
-    recycled_materials_percentage: { type: "string" },
-    toxicity: { type: "string", enum: ["Very Low", "Low", "Medium-Low", "Medium", "Medium-High", "High", "Very High"] },
-    eco_score: { type: "number" }
-  },
-  required: [
-    "materials",
-    "recyclability",
-    "biodegradability",
-    "energy_consumption",
-    "electricity_usage",
-    "gasoline_usage",
-    "water_usage",
-    "emission_levels",
-    "recycled_materials_percentage",
-    "toxicity",
-    "eco_score",
-  ]
-} as const;
 
 function labelFromScore(score: number): string {
   const labels = ["Very Low", "Low", "Medium-Low", "Medium", "Medium-High", "High", "Very High"];
@@ -88,40 +56,38 @@ export async function POST(req: NextRequest) {
     const fallbackName = extractFromUrl(url) || "Amazon product";
     const title = (await fetchAmazonTitle(url)) || fallbackName;
 
-    // Prepare catalog context summary for the model (few-shot grounding)
     const topGreen = loadCatalog()
       .filter((x) => rankToNumeric(x["Overall environmental ranking"]) >= 5)
       .slice(0, 20)
       .map((x) => ({ name: x.Item, ranking: x["Overall environmental ranking"], materials: x.Materials }));
 
-    const genAI = getGeminiClient();
-    const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
+    const ai = getGenAiClient();
 
-    const system = `You are an environmental impact rater. Respond ONLY as strict JSON following responseSchema. Estimate values conservatively when unknown.`;
-    const user = `Rate the environmental friendliness of this product and return eco_score on a 0-6 scale (0 Very Low ... 6 Very High). Product name: ${title}. If the product likely uses a battery, reflect that in toxicity and recyclability. Consider general knowledge and the catalog summary for similar items: ${JSON.stringify(topGreen).slice(0, 4000)}`;
+    const system = `You are an environmental impact rater. Respond ONLY as strict JSON with fields: materials[], recyclability, biodegradability, energy_consumption, electricity_usage, gasoline_usage, water_usage, emission_levels, recycled_materials_percentage, toxicity, eco_score (0-6).`;
+    const user = `Product name: ${title}. Consider catalog items (for grounding): ${JSON.stringify(topGreen).slice(0, 4000)}`;
 
-    const result = await model.generateContent({
+    const result = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
       contents: [
         { role: "user", parts: [{ text: system }] },
         { role: "user", parts: [{ text: user }] },
       ],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
-        responseSchema: responseSchema as any,
-        temperature: 0.2,
+        // If thinking is available on this model, budget small or omit entirely
+        // thinkingConfig: { thinkingBudget: 0 },
       },
     });
 
-    const text = result.response.text();
+    const text = result.text;
     let parsed: any;
     try {
       parsed = JSON.parse(text);
     } catch {
-      return NextResponse.json({ error: "Model returned invalid JSON" }, { status: 500 });
+      return NextResponse.json({ error: "Model returned invalid JSON" }, { status: 502 });
     }
 
     const ecoScore = typeof parsed.eco_score === "number" ? parsed.eco_score : 3;
-
     const alternatives = suggestAlternatives(title, 6);
 
     return NextResponse.json({
