@@ -19,6 +19,7 @@ type Alternative = {
   name: string;
   scoreLabel: string;
   materials?: string;
+  link?: string;
 };
 
 export default function Page() {
@@ -27,6 +28,8 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
     productName: string;
+    isRenewed?: boolean;
+    productType?: string | null;
     eco: { score: number; label: string; breakdown: EcoBreakdown };
     alternatives: Alternative[];
   } | null>(null);
@@ -82,6 +85,12 @@ export default function Page() {
           <div className="container-card p-6">
             <div className="mb-2 text-xs uppercase tracking-wide text-gray-500">Product</div>
             <h3 className="text-lg font-semibold">{result.productName}</h3>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+              {result.productType && <span className="rounded bg-gray-100 px-2 py-1 ring-1 ring-gray-200">Type: {result.productType}</span>}
+              {typeof result.isRenewed === "boolean" && (
+                <span className="rounded bg-gray-100 px-2 py-1 ring-1 ring-gray-200">{result.isRenewed ? "Renewed / Refurbished" : "New (likely)"}</span>
+              )}
+            </div>
             <div className="mt-3 flex items-center gap-3">
               <span className="inline-flex items-center rounded-md bg-eco/10 px-2 py-1 text-sm font-medium text-eco ring-1 ring-eco/30">
                 Eco score: {result.eco.score} / 6 ({result.eco.label})
@@ -108,6 +117,11 @@ export default function Page() {
                     <div className="font-medium">{alt.name}</div>
                     <div className="text-xs text-gray-600">Ranking: {alt.scoreLabel}</div>
                     {alt.materials && <div className="mt-1 text-xs text-gray-600">Materials: {alt.materials}</div>}
+                    {alt.link && (
+                      <a className="mt-2 inline-flex text-sm text-eco hover:underline" href={alt.link} target="_blank" rel="noreferrer">
+                        View on Amazon
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>

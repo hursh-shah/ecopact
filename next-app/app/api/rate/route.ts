@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGeminiClient, DEFAULT_MODEL } from "@/lib/gemini";
 import { loadCatalog, suggestAlternatives, rankToNumeric } from "@/lib/catalog";
+import { extractAmazonInfo } from "@/lib/amazon";
 
 export const runtime = "nodejs";
 
@@ -8,7 +9,6 @@ function extractFromUrl(url: string): string | null {
   try {
     const u = new URL(url);
     const parts = u.pathname.split("/").filter(Boolean);
-    // typical: /Apple-iPhone-15-256GB/dp/B0... => take first segment
     if (parts.length > 0) {
       const slug = decodeURIComponent(parts[0]);
       if (!slug.toLowerCase().startsWith("dp")) {
@@ -21,26 +21,9 @@ function extractFromUrl(url: string): string | null {
   }
 }
 
-async function fetchAmazonTitle(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0 Safari/537.36",
-        "accept-language": "en-US,en;q=0.9",
-      },
-      // 10s timeout via AbortController
-      signal: AbortSignal.timeout(10000),
-    });
-    const html = await res.text();
-    const m1 = html.match(/id=\"productTitle\"[^>]*>([^<]+)/i);
-    if (m1 && m1[1]) return m1[1].trim();
-    const m2 = html.match(/<title>([^<]+)<\/title>/i);
-    if (m2 && m2[1]) return m2[1].replace(/\s*:\s*Amazon\..+$/i, "").trim();
-    return null;
-  } catch {
-    return null;
-  }
+function amazonSearchUrl(query: string) {
+  const q = encodeURIComponent(query);
+  return `https://www.amazon.com/s?k=${q}`;
 }
 
 const responseSchema = {
@@ -85,10 +68,9 @@ export async function POST(req: NextRequest) {
     const url = String(body.url || "");
     if (!url) return NextResponse.json({ error: "Missing url" }, { status: 400 });
 
-    const fallbackName = extractFromUrl(url) || "Amazon product";
-    const title = (await fetchAmazonTitle(url)) || fallbackName;
+    const extracted = await extractAmazonInfo(url);
+    const fallbackName = extracted.title || extractFromUrl(url) || "Amazon product";
 
-    // Prepare catalog context summary for the model (few-shot grounding)
     const topGreen = loadCatalog()
       .filter((x) => rankToNumeric(x["Overall environmental ranking"]) >= 5)
       .slice(0, 20)
@@ -98,7 +80,7 @@ export async function POST(req: NextRequest) {
     const model = genAI.getGenerativeModel({ model: DEFAULT_MODEL });
 
     const system = `You are an environmental impact rater. Respond ONLY as strict JSON following responseSchema. Estimate values conservatively when unknown.`;
-    const user = `Rate the environmental friendliness of this product and return eco_score on a 0-6 scale (0 Very Low ... 6 Very High). Product name: ${title}. If the product likely uses a battery, reflect that in toxicity and recyclability. Consider general knowledge and the catalog summary for similar items: ${JSON.stringify(topGreen).slice(0, 4000)}`;
+    const user = `Rate the environmental friendliness of this product and return eco_score on a 0-6 scale (0 Very Low ... 6 Very High). Product name: ${fallbackName}. Hints: isRenewed=${extracted.isRenewed}; productType=${extracted.productType}; materialsHint=${extracted.materialsHint}. Consider catalog summary for similar items: ${JSON.stringify(topGreen).slice(0, 4000)}`;
 
     const result = await model.generateContent({
       contents: [
@@ -122,10 +104,20 @@ export async function POST(req: NextRequest) {
 
     const ecoScore = typeof parsed.eco_score === "number" ? parsed.eco_score : 3;
 
-    const alternatives = suggestAlternatives(title, 6);
+    // Alternatives constrained to same product type when available
+    const productType = extracted.productType || (fallbackName.toLowerCase().includes("phone") ? "phone" : null);
+    let alternatives = suggestAlternatives(fallbackName, 6).map((a) => ({
+      ...a,
+      link: amazonSearchUrl(`${a.name} ${productType || ""}`.trim()),
+    }));
+    if (productType) {
+      alternatives = alternatives.map((a) => ({ ...a, link: amazonSearchUrl(`${productType} ${a.name}`) }));
+    }
 
     return NextResponse.json({
-      productName: title,
+      productName: fallbackName,
+      isRenewed: extracted.isRenewed,
+      productType: extracted.productType,
       eco: {
         score: Math.max(0, Math.min(6, Math.round(ecoScore))),
         label: labelFromScore(ecoScore),
