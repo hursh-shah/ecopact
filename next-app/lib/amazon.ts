@@ -41,7 +41,7 @@ export async function extractAmazonInfo(url: string): Promise<AmazonInfo> {
 
     const bc = $("#wayfinding-breadcrumbs_feature_div").text().toLowerCase();
     const corpus = `${bc} ${t}`;
-    const typeMatch = corpus.match(/(phone|smartphone|laptop|headphones|earbuds|camera|backpack|jacket|shoes|bottle|notebook|charger|battery|tablet)/i);
+    const typeMatch = corpus.match(/(phone|smartphone|laptop|computer|headphones|earbuds|camera|backpack|jacket|shoes|bottle|notebook|charger|battery|tablet|vacuum|cleaner|bag|watch|speaker|keyboard|mouse|monitor|chair|desk|lamp|fan|heater|blender|mixer|kettle|toaster|iron|dryer|washer|dishwasher|refrigerator|microwave)/i);
     info.productType = typeMatch ? typeMatch[1].toLowerCase() : null;
   } catch {
     // ignore network errors and return best-effort info

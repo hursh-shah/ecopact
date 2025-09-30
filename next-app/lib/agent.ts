@@ -112,17 +112,36 @@ export async function findSustainableAlternatives(
 ): Promise<Alternative[]> {
   console.log(`\n🤖 Finding sustainable alternatives for: ${productName}`);
   console.log(`📊 Current product score: ${currentScore}`);
-  console.log(`🎯 Target score: ${Math.max(4, currentScore + 1)} or higher`);
+  
+  // More lenient threshold: for products < 4, aim for 4+; for products >= 4, aim for +0.5
+  const targetScore = currentScore < 4 ? 4 : currentScore + 0.5;
+  console.log(`🎯 Target score: ${targetScore} or higher`);
 
   const alternatives: Alternative[] = [];
   const seen = new Set<string>();
 
-  // Search with eco-focused queries
+  // Extract a short search term - use product type if available, otherwise extract from product name
+  let searchTerm = productType;
+  
+  if (!searchTerm) {
+    // Extract key product keywords from the name (first 2-3 meaningful words)
+    const words = productName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !['the', 'and', 'for', 'with'].includes(w));
+    
+    searchTerm = words.slice(0, 2).join(' ') || words[0] || 'product';
+  }
+
+  console.log(`🔎 Using search term: "${searchTerm}"`);
+
+  // Search with eco-focused queries using the short search term
   const fallbackQueries = [
-    `${productType || productName} recycled sustainable`,
-    `${productType || productName} eco friendly organic`,
-    `${productType || productName} renewed refurbished`,
-    `${productType || productName} biodegradable recyclable`,
+    `${searchTerm} recycled sustainable`,
+    `${searchTerm} eco friendly organic`,
+    `${searchTerm} renewed refurbished`,
+    `${searchTerm} biodegradable recyclable`,
   ];
 
   for (const query of fallbackQueries) {
@@ -130,6 +149,7 @@ export async function findSustainableAlternatives(
 
     console.log(`🔍 Searching: ${query}`);
     const searchResults = await searchAmazon(query, 4);
+    console.log(`  📦 Found ${searchResults.length} products on Amazon`);
     
     for (const result of searchResults) {
       if (alternatives.length >= maxResults) break;
@@ -148,7 +168,8 @@ export async function findSustainableAlternatives(
 
       console.log(`  → Score: ${rating.score}/6 (${rating.label}), Recycled: ${rating.recycledPercentage}`);
 
-      if (rating.score >= Math.max(4, currentScore + 1)) {
+      const targetScore = currentScore < 4 ? 4 : currentScore + 0.5;
+      if (rating.score >= targetScore) {
         console.log(`  ✅ Meets criteria! Adding to alternatives.`);
         alternatives.push({
           name: result.title,
