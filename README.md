@@ -1,20 +1,34 @@
-# Ecopact
+# Ecopact (Next.js + Gemini)
 
-## Summary 
+Rate Amazon product links for environmental friendliness and suggest greener alternatives. Built with Next.js 14, Tailwind, and Google Gemini. All Next.js code in root directory next-app, with other files saved for archiving purposes from a Hackathon. 
 
-Ecopact is a website created to help online shoppers understand the environmental impact of consumer products.
+## Quickstart
 
-## Usage
-
-The React website can be run with the following commands:
-```
+1. Install dependencies
+```bash
+cd next-app
 npm install
-npm start
 ```
-The Flask server can be run with the following commands:
+2. Configure environment
+```bash
+auth cp .env.example .env.local
+# Set GEMINI_API_KEY=your_key  (or GOOGLE_API_KEY for backward compat)
+# Optionally set GEMINI_MODEL_ID (aliases supported: gemini-flash-latest → gemini-1.5-flash)
 ```
-cd flask-server
-python server.py
+3. Run locally
+```bash
+npm run dev
 ```
-Launch the website, then enter your product and view your results.
+4. Open http://localhost:3000
 
+## API
+- `POST /api/rate` body: `{ "url": "https://www.amazon.com/..." }`
+- Response: `{ productName, eco: { score, label, breakdown }, alternatives }`
+
+## Deployment (Vercel)
+- Set Root Directory to `next-app`
+- Add `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) and optional `GEMINI_MODEL_ID` in Project Settings → Environment Variables
+- Deploy
+
+## Tuning Gemini
+See `docs/TUNING.md` for preparing a JSONL dataset and creating a tuned model. Set `GEMINI_MODEL_ID` to your tuned model ID. 
