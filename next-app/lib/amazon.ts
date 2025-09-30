@@ -1,4 +1,4 @@
-import cheerio from "cheerio";
+import { load } from "cheerio";
 
 export type AmazonInfo = {
   title: string | null;
@@ -26,7 +26,7 @@ export async function extractAmazonInfo(url: string): Promise<AmazonInfo> {
       signal: AbortSignal.timeout(10000),
     });
     const html = await res.text();
-    const $ = cheerio.load(html);
+    const $ = load(html);
     const t = $("#productTitle").text().trim() || $("title").text().replace(/\s*:\s*Amazon\..+$/i, "").trim();
     info.title = t || null;
 
