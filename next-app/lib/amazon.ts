@@ -66,7 +66,20 @@ export async function searchAmazon(query: string, limit = 6): Promise<AmazonSear
       },
       signal: AbortSignal.timeout(10000),
     });
+    
+    if (!res.ok) {
+      console.error(`❌ Amazon search failed: HTTP ${res.status} for query "${query}"`);
+      return [];
+    }
+    
     const html = await res.text();
+    
+    // Check if Amazon is blocking us (CAPTCHA or bot detection)
+    if (html.includes('api-services-support@amazon.com') || html.includes('Robot Check')) {
+      console.error(`🤖 Amazon bot detection triggered for query: "${query}"`);
+      return [];
+    }
+    
     const $ = load(html);
     const results: AmazonSearchResult[] = [];
     $(".s-main-slot .s-result-item[data-component-type='s-search-result'] h2 a").each((_, el) => {
@@ -81,8 +94,14 @@ export async function searchAmazon(query: string, limit = 6): Promise<AmazonSear
         results.push({ title, url, isRenewed });
       }
     });
+    
+    if (results.length === 0) {
+      console.warn(`⚠️ No products found on Amazon for query: "${query}". Selectors may need updating.`);
+    }
+    
     return results.slice(0, limit);
-  } catch {
+  } catch (err: any) {
+    console.error(`❌ Amazon search error for "${query}":`, err.message);
     return [];
   }
 } 

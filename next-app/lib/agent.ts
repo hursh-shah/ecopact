@@ -2,6 +2,7 @@ import { generateText, tool } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { searchAmazon, extractAmazonInfo } from "./amazon";
+import { loadCatalog, rankToNumeric } from "./catalog";
 
 // Helper to rate a product's environmental impact
 async function rateProductEnvironmentally(
@@ -144,11 +145,14 @@ export async function findSustainableAlternatives(
     `${searchTerm} biodegradable recyclable`,
   ];
 
+  let totalAmazonResults = 0;
+
   for (const query of fallbackQueries) {
     if (alternatives.length >= maxResults) break;
 
     console.log(`🔍 Searching: ${query}`);
     const searchResults = await searchAmazon(query, 4);
+    totalAmazonResults += searchResults.length;
     console.log(`  📦 Found ${searchResults.length} products on Amazon`);
     
     for (const result of searchResults) {
@@ -185,6 +189,48 @@ export async function findSustainableAlternatives(
         seen.add(result.url);
       } else {
         console.log(`  ❌ Score too low, skipping.`);
+      }
+    }
+  }
+
+  // Fallback to catalog if Amazon scraping failed
+  if (totalAmazonResults === 0) {
+    console.warn(`⚠️ Amazon scraping failed (0 total results). Falling back to catalog data...`);
+    const catalog = loadCatalog();
+    
+    // Find similar products in catalog based on search term
+    const catalogMatches = catalog.filter(item => {
+      const itemName = item.Item.toLowerCase();
+      const rankNum = rankToNumeric(item["Overall environmental ranking"]);
+      const meetsScore = rankNum >= 4; // High or Very High only
+      
+      // Check if search term words appear in item name
+      const searchWords = searchTerm.toLowerCase().split(/\s+/);
+      const hasMatch = searchWords.some(word => itemName.includes(word));
+      
+      return hasMatch && meetsScore;
+    }).slice(0, maxResults);
+
+    console.log(`  📚 Found ${catalogMatches.length} alternatives in catalog`);
+    
+    for (const item of catalogMatches) {
+      if (alternatives.length >= maxResults) break;
+      
+      const rankNum = rankToNumeric(item["Overall environmental ranking"]);
+      const targetScore = currentScore < 4 ? 4 : currentScore + 0.5;
+      
+      if (rankNum >= targetScore) {
+        alternatives.push({
+          name: item.Item,
+          url: `https://www.amazon.com/s?k=${encodeURIComponent(item.Item)}`, // Generic search link
+          score: rankNum,
+          scoreLabel: item["Overall environmental ranking"],
+          materials: item.Materials ? item.Materials.split(',').map(m => m.trim()) : [],
+          recyclability: "Unknown",
+          recycledPercentage: "Unknown",
+          biodegradability: "Unknown",
+          isRenewed: false,
+        });
       }
     }
   }
