@@ -1,6 +1,6 @@
 # Ecopact (Next.js + Gemini)
 
-Rate Amazon product links for environmental friendliness and suggest greener alternatives. Built with Next.js 14,Typescript, Tailwind, and Google Gemini. All Next.js code in root directory next-app, with other files saved for archiving purposes.
+Rate Amazon product links for environmental friendliness and suggest greener alternatives using AI Agents. Built with Next.js 14,Typescript, Tailwind, and Google Gemini. All Next.js code in root directory next-app, with other files saved for archiving purposes.
 
 1st place winner of the 450 participant HackBytes II Hackathon ($46,000 in prizes)
 
@@ -34,6 +34,7 @@ npm run dev
 
 ## Tuning Gemini
 See `docs/TUNING.md` for preparing a JSONL dataset and creating a tuned model. Set `GEMINI_MODEL_ID` to your tuned model ID. 
+
 
 
 
