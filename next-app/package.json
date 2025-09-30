@@ -12,7 +12,9 @@
     "tuning:prepare": "node scripts/prepare-tuning.js"
   },
   "dependencies": {
+    "@ai-sdk/google": "^2.0.17",
     "@google/generative-ai": "^0.18.0",
+    "ai": "^5.0.59",
     "cheerio": "^1.0.0",
     "clsx": "^2.1.1",
     "next": "14.2.5",
@@ -31,4 +33,4 @@
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.4"
   }
-} 
+}

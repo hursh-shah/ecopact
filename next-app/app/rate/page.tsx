@@ -18,8 +18,13 @@ type EcoBreakdown = {
 type Alternative = {
   name: string;
   scoreLabel: string;
+  score?: number;
   materials?: string;
   link?: string;
+  recyclability?: string;
+  recycledPercentage?: string;
+  biodegradability?: string;
+  isRenewed?: boolean;
 };
 
 export default function RatePage() {
@@ -112,14 +117,59 @@ export default function RatePage() {
               <p className="text-sm text-gray-600">No close alternatives found in our catalog.</p>
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {result.alternatives.map((alt) => (
-                  <li key={alt.name} className="rounded-md border border-gray-200 p-3">
-                    <div className="font-medium">{alt.name}</div>
-                    <div className="text-xs text-gray-600">Ranking: {alt.scoreLabel}</div>
-                    {alt.materials && <div className="mt-1 text-xs text-gray-600">Materials: {alt.materials}</div>}
+                {result.alternatives.map((alt, idx) => (
+                  <li key={`${alt.name}-${idx}`} className="rounded-md border border-gray-200 p-4 hover:border-eco/50 transition-colors">
+                    <div className="font-medium text-gray-900 line-clamp-2">{alt.name}</div>
+                    
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-md bg-eco/10 px-2 py-0.5 text-xs font-medium text-eco ring-1 ring-eco/30">
+                        {alt.score !== undefined ? `${alt.score}/6` : alt.scoreLabel}
+                      </span>
+                      {alt.isRenewed && (
+                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-blue-200">
+                          Renewed
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-3 space-y-1.5 text-xs text-gray-600">
+                      {alt.materials && (
+                        <div className="flex items-start gap-1">
+                          <span className="font-medium text-gray-700">Materials:</span>
+                          <span className="flex-1">{alt.materials}</span>
+                        </div>
+                      )}
+                      {alt.recycledPercentage && (
+                        <div className="flex items-start gap-1">
+                          <span className="font-medium text-gray-700">Recycled:</span>
+                          <span className="flex-1">{alt.recycledPercentage}</span>
+                        </div>
+                      )}
+                      {alt.recyclability && (
+                        <div className="flex items-start gap-1">
+                          <span className="font-medium text-gray-700">Recyclability:</span>
+                          <span className="flex-1">{alt.recyclability}</span>
+                        </div>
+                      )}
+                      {alt.biodegradability && (
+                        <div className="flex items-start gap-1">
+                          <span className="font-medium text-gray-700">Biodegradable:</span>
+                          <span className="flex-1">{alt.biodegradability}</span>
+                        </div>
+                      )}
+                    </div>
+
                     {alt.link && (
-                      <a className="mt-2 inline-flex text-sm text-eco hover:underline" href={alt.link} target="_blank" rel="noreferrer">
+                      <a 
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-eco hover:underline" 
+                        href={alt.link} 
+                        target="_blank" 
+                        rel="noreferrer"
+                      >
                         View on Amazon
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
                       </a>
                     )}
                   </li>

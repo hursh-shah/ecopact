@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGeminiClient, DEFAULT_MODEL } from "@/lib/gemini";
 import { loadCatalog, rankToNumeric } from "@/lib/catalog";
-import { extractAmazonInfo, searchAmazon } from "@/lib/amazon";
+import { extractAmazonInfo } from "@/lib/amazon";
+import { findSustainableAlternatives } from "@/lib/agent";
 
 export const runtime = "nodejs";
+export const maxDuration = 60; // Allow up to 60 seconds for agent operations
 
 function extractFromUrl(url: string): string | null {
   try {
@@ -99,32 +101,28 @@ export async function POST(req: NextRequest) {
 
     const ecoScore = typeof parsed.eco_score === "number" ? parsed.eco_score : 3;
 
-    // Amazon alternatives: constrain by same product type and prefer eco signals
-    const typeKeyword = extracted.productType || fallbackName.split(" ")[0];
-    const ecoKeywords = ["recycled", "renewed", "refurbished", "eco", "sustainable", "recyclable", "low toxicity"];
-    const queries = [
-      `${typeKeyword} ${ecoKeywords[0]}`,
-      `${typeKeyword} renewed`,
-      `${typeKeyword} recyclable`,
-      `${typeKeyword} sustainable`,
-      `${typeKeyword} low toxicity`,
-      `${typeKeyword}`,
-    ].filter(Boolean);
+    // Use AI agent to find sustainable alternatives
+    console.log(`\n🤖 Starting agent to find sustainable alternatives for: ${fallbackName}`);
+    console.log(`📊 Current product score: ${ecoScore} (${labelFromScore(ecoScore)})`);
+    
+    const alternatives = await findSustainableAlternatives(
+      fallbackName,
+      extracted.productType,
+      ecoScore,
+      4 // Find top 4 alternatives
+    );
 
-    const seen = new Set<string>();
-    const altCollected: { name: string; scoreLabel: string; materials?: string; link: string }[] = [];
-    for (const q of queries) {
-      const batch = await searchAmazon(q, 6);
-      for (const r of batch) {
-        if (seen.has(r.url)) continue;
-        seen.add(r.url);
-        const name = r.title;
-        const scoreLabel = r.isRenewed ? "High" : "Medium"; // heuristic: renewed considered greener
-        altCollected.push({ name, scoreLabel, materials: undefined, link: r.url });
-        if (altCollected.length >= 6) break;
-      }
-      if (altCollected.length >= 6) break;
-    }
+    const altCollected = alternatives.map(alt => ({
+      name: alt.name,
+      scoreLabel: alt.scoreLabel,
+      score: alt.score,
+      materials: alt.materials.join(", "),
+      link: alt.url,
+      recyclability: alt.recyclability,
+      recycledPercentage: alt.recycledPercentage,
+      biodegradability: alt.biodegradability,
+      isRenewed: alt.isRenewed,
+    }));
 
     return NextResponse.json({
       productName: fallbackName,

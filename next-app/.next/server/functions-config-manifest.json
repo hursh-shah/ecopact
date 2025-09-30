@@ -1,1 +1,1 @@
-{"version":1,"functions":{"/api/rate":{}}}
+{"version":1,"functions":{"/api/rate":{"maxDuration":60}}}
