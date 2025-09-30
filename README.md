@@ -14,7 +14,7 @@ npm install
 2. Configure environment
 ```bash
 auth cp .env.example .env.local
-# Set GEMINI_API_KEY=your_key  (or GOOGLE_API_KEY for backward compat)
+# Set GEMINI_API_KEY=your_key  
 # Optionally set GEMINI_MODEL_ID (example: gemini-flash-latest)
 ```
 3. Run locally
