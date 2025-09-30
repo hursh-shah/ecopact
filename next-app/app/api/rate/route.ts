@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGeminiClient, DEFAULT_MODEL } from "@/lib/gemini";
-import { loadCatalog, suggestAlternatives, rankToNumeric } from "@/lib/catalog";
-import { extractAmazonInfo } from "@/lib/amazon";
+import { loadCatalog, rankToNumeric } from "@/lib/catalog";
+import { extractAmazonInfo, searchAmazon } from "@/lib/amazon";
 
 export const runtime = "nodejs";
 
@@ -19,11 +19,6 @@ function extractFromUrl(url: string): string | null {
   } catch {
     return null;
   }
-}
-
-function amazonSearchUrl(query: string) {
-  const q = encodeURIComponent(query);
-  return `https://www.amazon.com/s?k=${q}`;
 }
 
 const responseSchema = {
@@ -104,14 +99,31 @@ export async function POST(req: NextRequest) {
 
     const ecoScore = typeof parsed.eco_score === "number" ? parsed.eco_score : 3;
 
-    // Alternatives constrained to same product type when available
-    const productType = extracted.productType || (fallbackName.toLowerCase().includes("phone") ? "phone" : null);
-    let alternatives = suggestAlternatives(fallbackName, 6).map((a) => ({
-      ...a,
-      link: amazonSearchUrl(`${a.name} ${productType || ""}`.trim()),
-    }));
-    if (productType) {
-      alternatives = alternatives.map((a) => ({ ...a, link: amazonSearchUrl(`${productType} ${a.name}`) }));
+    // Amazon alternatives: constrain by same product type and prefer eco signals
+    const typeKeyword = extracted.productType || fallbackName.split(" ")[0];
+    const ecoKeywords = ["recycled", "renewed", "refurbished", "eco", "sustainable", "recyclable", "low toxicity"];
+    const queries = [
+      `${typeKeyword} ${ecoKeywords[0]}`,
+      `${typeKeyword} renewed`,
+      `${typeKeyword} recyclable`,
+      `${typeKeyword} sustainable`,
+      `${typeKeyword} low toxicity`,
+      `${typeKeyword}`,
+    ].filter(Boolean);
+
+    const seen = new Set<string>();
+    const altCollected: { name: string; scoreLabel: string; materials?: string; link: string }[] = [];
+    for (const q of queries) {
+      const batch = await searchAmazon(q, 6);
+      for (const r of batch) {
+        if (seen.has(r.url)) continue;
+        seen.add(r.url);
+        const name = r.title;
+        const scoreLabel = r.isRenewed ? "High" : "Medium"; // heuristic: renewed considered greener
+        altCollected.push({ name, scoreLabel, materials: undefined, link: r.url });
+        if (altCollected.length >= 6) break;
+      }
+      if (altCollected.length >= 6) break;
     }
 
     return NextResponse.json({
@@ -123,7 +135,7 @@ export async function POST(req: NextRequest) {
         label: labelFromScore(ecoScore),
         breakdown: parsed,
       },
-      alternatives,
+      alternatives: altCollected,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || "Unexpected error" }, { status: 500 });
